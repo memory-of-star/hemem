@@ -89,10 +89,10 @@ static void *timing_thread()
   uint64_t tic = -1;
   for (;;) {
     tic++;
-    if (tic % 600 == 0) {
+    if (tic % 200 == 0) {
       move_hotset = true;
     }
-    if (tic >= 200) {
+    if (tic >= 20) {
       stop = true;
     }
     sleep(1);
@@ -162,7 +162,7 @@ static void *do_gups(void *arguments)
 
   hot_region_random = lfsr_fast(hot_region_random);
 
-  fprintf(hotsetfile, "Thread %d region: %p - %p\thot set: %p - %p\n", args->tid, field, field + args->size, field + args->hot_start, field + args->hot_start + args->hotsize);   
+  fprintf(hotsetfile, "Thread %d region: %p - %p\thot set: %p - %p\n", args->tid, field, field + (args->size * elt_size), field + args->hot_start, field + args->hot_start + (args->hotsize * elt_size));   
 
   for (i = 0; i < args->iters; i++) {
     hot_num = lfsr_fast(lfsr) % 100;
@@ -173,14 +173,11 @@ static void *do_gups(void *arguments)
         hot_region_random = lfsr_fast(hot_region_random);
         args->hot_start = (hot_region_random % (args->size));
         move_hotset = false;
-        if (args->hot_start + args->hotsize < args->size)
-          printf("Thread %d region: %p - %p\thot set moved: %p - %p\n", args->tid, field, field + args->size, field + args->hot_start, field + args->hot_start + args->hotsize);  
-        else
-          printf("Thread %d region: %p - %p\thot set moved: %p - %p, %p - %p\n", args->tid, field, field + args->size, field + args->hot_start, field + args->size, field, field + args->hot_start + args->hotsize - args->size);
+        printf("Thread %d region: %p - %p\thot set moved: %p - %p\n", args->tid, field, field + (args->size * elt_size), field + args->hot_start, field + args->hot_start + (args->hotsize * elt_size));  
       }
 
       if (elt_size == 8) {
-        volatile uint64_t tmp = *(volatile uint64_t*)(field + index1);
+        uint64_t  tmp = field[index1];
         tmp = tmp + i;
         field[index1] = tmp;
       }
@@ -196,7 +193,7 @@ static void *do_gups(void *arguments)
       index2 = lfsr % (args->size);
 
       if (elt_size == 8) {
-        volatile uint64_t tmp = *(volatile uint64_t*)(field + index2);
+        uint64_t tmp = field[index2];
         tmp = tmp + i;
         field[index2] = tmp;
       }
@@ -236,7 +233,6 @@ int main(int argc, char **argv)
   int i;
   void *p;
   struct gups_args** ga;
-  pthread_t t[MAX_THREADS];
 
 
 
@@ -275,10 +271,9 @@ int main(int argc, char **argv)
   fprintf(stderr, "field of %lu bytes\n", size);
   fprintf(stderr, "%ld byte element size (%ld elements total)\n", elt_size, size / elt_size);
 
-
-  // p = malloc(size);
-  // memset(p, -1, size);
-  p = mmap((void *)(0x1e00000000), size, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  // p = mmap((void *)(0x1e00000000), size, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  p = malloc(size);
+  memset(p, -1, size);
   // p = mmap((void *)(0x1e00000000), size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (p == MAP_FAILED) {
     perror("mmap");
@@ -289,11 +284,7 @@ int main(int argc, char **argv)
   int mode = MPOL_BIND | (MPOL_F_NUMA_BALANCING);
   unsigned long nodemask = -1;
 
-  // if (set_mempolicy(mode, &nodemask, sizeof(nodemask) * 8) == -1) {
-  //   perror("set_mempolicy");
-  //   return 1;
-  // }
-  if (mbind((void *)(0x1e00000000), size, mode, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE)) {
+  if (set_mempolicy(mode, &nodemask, sizeof(nodemask) * 8) == -1) {
     perror("set_mempolicy");
     return 1;
   }
@@ -383,15 +374,14 @@ int main(int argc, char **argv)
     ga[i]->elt_size = elt_size;
     ga[i]->hot_start = 0;        // hot set at start of thread's region
     ga[i]->hotsize = hotsize;
-    int r = pthread_create(&t[i], NULL, do_gups, (void*)ga[i]);
-    assert(r == 0);
+    do_gups((void *)(ga[i]));
   }
 
   // wait for worker threads
-  for (i = 0; i < threads; i++) {
-    int r = pthread_join(t[i], NULL);
-    assert(r == 0);
-  }
+  // for (i = 0; i < threads; i++) {
+  //   int r = pthread_join(t[i], NULL);
+  //   assert(r == 0);
+  // }
   gettimeofday(&stoptime, NULL);
 
   secs = elapsed(&starttime, &stoptime);

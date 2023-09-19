@@ -21,7 +21,10 @@ gups-pebs: gups.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o gups-pebs gups.o zipf.o $(LIBS) -L../src/ -lhemem
 
 gups-hotset-move: gups-hotset-move.o
-	$(CC) $(CFLAGS) $(INCLUDES) -o gups-hotset-move gups-hotset-move.o zipf.o $(LIBS) -L../src/ -lhemem
+	$(CC) $(CFLAGS) $(INCLUDES) -o gups-hotset-move gups-hotset-move.o zipf.o $(LIBS) -L../src/ -lnuma
+
+gups-hotset-single-thread: gups-hotset-single-thread.o
+	$(CC) $(CFLAGS) $(INCLUDES) -o gups-hotset-single-thread gups-hotset-single-thread.o zipf.o $(LIBS) -L../src/ -lnuma
 
 gups-simple: gups.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o gups-simple gups.o zipf.o $(LIBS) -L../src/ -lhemem-simple
@@ -41,5 +44,8 @@ gups.o: gups.c zipf.c  gups.h
 gups-hotset-move.o: gups-hotset-move.c zipf.c gups.h
 	$(CC) $(CFLAGS) $(INCLUDES) -c gups-hotset-move.c zipf.c
 
+gups-hotset-single-thread.o: gups-hotset-single-thread.c zipf.c gups.h
+	$(CC) $(CFLAGS) $(INCLUDES) -c gups-hotset-single-thread.c zipf.c
+
 clean:
-	$(RM) *.o gups gups-hotset-move gups-lru-swap gups-lru gups-simple gups-random gups-pebs
+	$(RM) *.o gups gups-hotset-move gups-hotset-single-thread gups-lru-swap gups-lru gups-simple gups-random gups-pebs
