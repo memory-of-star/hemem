@@ -92,7 +92,7 @@ static void *timing_thread()
     if (tic % 600 == 0) {
       move_hotset = true;
     }
-    if (tic >= 200) {
+    if (tic >= 300) {
       stop = true;
     }
     sleep(1);
@@ -166,7 +166,7 @@ static void *do_gups(void *arguments)
 
   for (i = 0; i < args->iters; i++) {
     hot_num = lfsr_fast(lfsr) % 100;
-    if (hot_num < 100) {
+    if (hot_num < 90) {
       lfsr = lfsr_fast(lfsr);
       index1 = (args->hot_start + (lfsr % args->hotsize)) % (args->size);
       if (move_hotset) {
@@ -276,28 +276,21 @@ int main(int argc, char **argv)
   fprintf(stderr, "%ld byte element size (%ld elements total)\n", elt_size, size / elt_size);
 
 
-  // p = malloc(size);
-  // memset(p, -1, size);
-  p = mmap((void *)(0x1e00000000), size, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-  // p = mmap((void *)(0x1e00000000), size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  p = malloc(size);
+  memset(p, -1, size);
+
   if (p == MAP_FAILED) {
     perror("mmap");
     assert(0);
   }
 
-  //
-  int mode = MPOL_BIND | (MPOL_F_NUMA_BALANCING);
-  unsigned long nodemask = -1;
 
-  // if (set_mempolicy(mode, &nodemask, sizeof(nodemask) * 8) == -1) {
-  //   perror("set_mempolicy");
-  //   return 1;
-  // }
-  if (mbind((void *)(0x1e00000000), size, mode, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE)) {
-    perror("set_mempolicy");
-    return 1;
-  }
-  //
+//   int mode = MPOL_BIND | (MPOL_F_NUMA_BALANCING);
+//   unsigned long nodemask = -1;
+//   if (mbind((void *)(0x1e00000000), size, mode, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE)) {
+//     perror("mbind");
+//     return 1;
+//   }
 
 
   gettimeofday(&stoptime, NULL);
@@ -325,40 +318,6 @@ int main(int argc, char **argv)
   hot_start = 0;
   hotsize = (tot_hot_size / threads) / elt_size;
   printf("hot_start: %p\thot_end: %p\thot_size: %lu\n", p + hot_start, p + hot_start + (hotsize * elt_size), hotsize);
-
-  // gettimeofday(&starttime, NULL);
-  // for (i = 0; i < threads; i++) {
-  //   printf("starting thread [%d]\n", i);
-  //   ga[i] = (struct gups_args*)malloc(sizeof(struct gups_args));
-  //   ga[i]->tid = i;
-  //   ga[i]->field = p + (i * nelems * elt_size);
-  //   ga[i]->iters = updates;
-  //   ga[i]->size = nelems;
-  //   ga[i]->elt_size = elt_size;
-  //   ga[i]->hot_start = 0;        // hot set at start of thread's region
-  //   ga[i]->hotsize = hotsize;
-  // }
-  
-  // // run through gups once to touch all memory
-  // // spawn gups worker threads
-  // for (i = 0; i < threads; i++) {
-  //   int r = pthread_create(&t[i], NULL, do_gups, (void*)ga[i]);
-  //   assert(r == 0);
-  // }
-  
-  // // wait for worker threads
-  // for (i = 0; i < threads; i++) {
-  //   int r = pthread_join(t[i], NULL);
-  //   assert(r == 0);
-  // }
-
-  // gettimeofday(&stoptime, NULL);
-
-  // secs = elapsed(&starttime, &stoptime);
-  // printf("Elapsed time: %.4f seconds.\n", secs);
-  // gups = threads * ((double)updates) / (secs * 1.0e9);
-  // printf("GUPS1 = %.10f\n", gups);
-  // memset(thread_gups, 0, sizeof(thread_gups));
 
   pthread_t print_thread;
   int pt = pthread_create(&print_thread, NULL, print_instantaneous_gups, NULL);
@@ -410,4 +369,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-
