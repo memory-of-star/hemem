@@ -308,8 +308,6 @@ int main(int argc, char **argv)
   secs = elapsed(&starttime, &stoptime);
   fprintf(stderr, "Initialization time: %.4f seconds.\n", secs);
 
-  //hemem_start_timing();
-
   hot_start = 0;
   hotsize = (tot_hot_size / threads) / elt_size;
   printf("hot_start: %p\thot_end: %p\thot_size: %lu\n", p + hot_start, p + hot_start + (hotsize * elt_size), hotsize);
